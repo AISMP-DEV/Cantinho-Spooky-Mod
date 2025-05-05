@@ -1,23 +1,28 @@
 package net.aqualoco.cantinhospooky.client.screen;
 
+// ----- Imports -----
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.logging.LogUtils;
 import com.mojang.math.Axis;
+import net.aqualoco.cantinhospooky.Config; // Importar a classe Config
 import net.aqualoco.cantinhospooky.network.CritSuccessPacket;
+import net.aqualoco.cantinhospooky.network.FailResultPacket;
 import net.aqualoco.cantinhospooky.network.PacketHandler;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.core.BlockPos; // Importado
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.sounds.SoundEvent; // Import SoundEvent
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import org.slf4j.Logger;
+// -------------------
 
-// VERSÃO FINAL - COM ROTAÇÃO BASE - COM HITBOX ESPELHADA CORRIGIDA
 public class GeradorScreen extends Screen {
     private static final Logger LOGGER = LogUtils.getLogger();
 
@@ -29,22 +34,13 @@ public class GeradorScreen extends Screen {
     private static final int TEXTURE_WIDTH = 256; private static final int TEXTURE_HEIGHT = 256;
     private static final int POINTER_WIDTH = 12;  private static final int POINTER_HEIGHT = 8;
 
-    // --- Configurações Minigame ---
-    private float pointerDeg = 0f;
-    private static final float POINTER_SPEED_PER_TICK = 6.0f; // Sua velocidade
-    private int timeLeftTicks = 220; // Tempo inicial (11s)
-    private float randomRotationOffset = 0f;
-    private int catchHitCounter = 0;
-
-    // --- Configurações Visuais / Lógica ---
-    // << AJUSTE ESTES 3 VALORES APÓS TESTAR COM A VERSÃO DEBUG >>
+    // --- Configurações Visuais / Lógica Fixa ---
     private static final float POINTER_TRACK_RADIUS = 75f;
     private static final float CATCH_ZONE_WIDTH_DEGREES = 60f;
     private static final float CRIT_ZONE_WIDTH_DEGREES = 15f;
-
     private static final float ZONE_1_CENTER_ANGLE = 90f;
     private static final float ZONE_2_CENTER_ANGLE = 270f;
-    // (Constantes ZONE_*_START/END)
+    // (Constantes ZONE_*_START/END calculadas uma vez)
     private static final float CATCH_ZONE_1_START = normalizeDegrees(ZONE_1_CENTER_ANGLE - CATCH_ZONE_WIDTH_DEGREES / 2f);
     private static final float CATCH_ZONE_1_END = normalizeDegrees(ZONE_1_CENTER_ANGLE + CATCH_ZONE_WIDTH_DEGREES / 2f);
     private static final float CRIT_ZONE_1_START = normalizeDegrees(ZONE_1_CENTER_ANGLE - CRIT_ZONE_WIDTH_DEGREES / 2f);
@@ -54,29 +50,74 @@ public class GeradorScreen extends Screen {
     private static final float CRIT_ZONE_2_START = normalizeDegrees(ZONE_2_CENTER_ANGLE - CRIT_ZONE_WIDTH_DEGREES / 2f);
     private static final float CRIT_ZONE_2_END = normalizeDegrees(ZONE_2_CENTER_ANGLE + CRIT_ZONE_WIDTH_DEGREES / 2f);
 
-    public GeradorScreen(Component title) { super(title); }
+    // --- Estado do Minigame ---
+    private final BlockPos blockPos; // Posição do bloco sendo reparado
+    private int currentPhase = 0;
+    private float pointerDeg = 0f;
+    private float currentPointerSpeed = 0f; // Definido por startPhase usando Config
+    private int ticksRemainingThisPhase = 0; // Definido por startPhase usando Config
+    private float randomRotationOffset = 0f;
+    private boolean catchBonusUsedThisPhase = false;
 
-    // --- init() ---
+    // Construtor atualizado
+    public GeradorScreen(Component title, BlockPos pos) {
+        super(title);
+        this.blockPos = pos; // Armazena a posição recebida
+    }
+
     @Override
     protected void init() {
         super.init();
-        RandomSource randomSource = null;
-        if (this.minecraft != null && this.minecraft.level != null) { randomSource = this.minecraft.level.random; }
-        if (randomSource != null) {
-            this.randomRotationOffset = randomSource.nextFloat() * 360.0f;
-            this.pointerDeg = randomSource.nextFloat() * 360.0f;
-        } else {
-            LOGGER.warn("Não foi possível obter RandomSource do level, usando Math.random().");
-            this.randomRotationOffset = (float) (Math.random() * 360.0);
-            this.pointerDeg = (float) (Math.random() * 360.0);
+        startPhase(1); // Inicia Fase 1
+        playSound(SoundEvents.NOTE_BLOCK_PLING.get(), 1.0f, 1.0f); // Som inicial
+    }
+
+    // Método para configurar o início de uma fase
+    private void startPhase(int phase) {
+        if (phase > 3) {
+            handleFinalSuccess(); // Já completou fase 3, é sucesso
+            return;
         }
-        LOGGER.info("GeradorScreen inicializado com rotação offset: {}", String.format("%.1f", this.randomRotationOffset));
-        LOGGER.info("Posição inicial do ponteiro: {}", String.format("%.1f", this.pointerDeg));
-        this.timeLeftTicks = 220; // Define seu tempo inicial
-        this.catchHitCounter = 0;
-        Minecraft mc = Minecraft.getInstance();
-        // Som de início (Corrigido)
-        if (mc.player != null && mc.level != null) { mc.level.playSound(mc.player, mc.player.blockPosition(), SoundEvents.NOTE_BLOCK_PLING.get(), SoundSource.PLAYERS, 1.0f, 1.0f ); }
+        LOGGER.info("Iniciando Fase {} para Gerador em {}", phase, this.blockPos);
+        this.currentPhase = phase;
+        this.catchBonusUsedThisPhase = false; // Reseta bônus a cada fase
+
+        // Define velocidade e duração usando valores da Config via switch
+        switch (phase) {
+            case 1:
+                this.currentPointerSpeed = (float) Config.phase1Speed; // Cast para float
+                this.ticksRemainingThisPhase = Config.phase1DurationTicks;
+                break;
+            case 2:
+                this.currentPointerSpeed = (float) Config.phase2Speed;
+                this.ticksRemainingThisPhase = Config.phase2DurationTicks;
+                break;
+            case 3:
+                this.currentPointerSpeed = (float) Config.phase3Speed;
+                this.ticksRemainingThisPhase = Config.phase3DurationTicks;
+                break;
+            default: // Segurança: Se fase for inválida (ex: 0), encerra.
+                LOGGER.error("Tentativa de iniciar fase inválida: {}", phase);
+                closeScreen();
+                return;
+        }
+
+        // Re-randomiza rotação da base e posição inicial do ponteiro
+        RandomSource randomSource = getRandomSource();
+        this.randomRotationOffset = randomSource.nextFloat() * 360.0f;
+        this.pointerDeg = randomSource.nextFloat() * 360.0f;
+
+        // Som opcional de início de fase
+        // playSound(SoundEvents.NOTE_BLOCK_CHIME, 0.8f, 1.2f);
+    }
+
+    // Helper para obter RandomSource
+    private RandomSource getRandomSource() {
+        if (this.minecraft != null && this.minecraft.level != null) {
+            return this.minecraft.level.random;
+        }
+        LOGGER.warn("Não foi possível obter RandomSource do level, usando Math.random().");
+        return RandomSource.create((long) (Math.random() * Long.MAX_VALUE));
     }
 
     @Override public boolean isPauseScreen() { return false; }
@@ -84,25 +125,35 @@ public class GeradorScreen extends Screen {
     // --- RENDER ---
     @Override
     public void render(GuiGraphics gg, int mouseX, int mouseY, float partialTick) {
+        // Não deve ter mudado significativamente, apenas usa this.currentPointerSpeed
         this.renderBackground(gg);
         int centerX = this.width / 2; int centerY = this.height / 2;
         RenderSystem.enableBlend(); RenderSystem.defaultBlendFunc();
         RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
         RenderSystem.setShader(GameRenderer::getPositionTexShader);
+
         // Base Rotacionada
         gg.pose().pushPose();
         gg.pose().translate(centerX, centerY, 0);
         gg.pose().mulPose(Axis.ZP.rotationDegrees(this.randomRotationOffset));
         gg.blit(MINIGAME_TEXTURE, -TEXTURE_WIDTH / 2, -TEXTURE_HEIGHT / 2, 0, 0, TEXTURE_WIDTH, TEXTURE_HEIGHT, TEXTURE_WIDTH, TEXTURE_HEIGHT);
         gg.pose().popPose();
-        // Ponteiro (com interpolação Mth.rotLerp)
-        float visualPointerAngle = Mth.rotLerp(partialTick, this.pointerDeg, this.pointerDeg + POINTER_SPEED_PER_TICK);
+
+        // Ponteiro (com interpolação usando velocidade atual)
+        float visualPointerAngle = Mth.rotLerp(partialTick, this.pointerDeg, this.pointerDeg + this.currentPointerSpeed);
         drawPointer(gg, centerX, centerY, visualPointerAngle);
+
+        // Opcional: Desenhar Fase/Tempo
+        // String phaseText = "Fase: " + this.currentPhase;
+        // String timeText = String.format("Tempo: %.1f s", this.ticksRemainingThisPhase / 20.0f);
+        // gg.drawString(this.font, phaseText, 10, 10, 0xFFFFFF);
+        // gg.drawString(this.font, timeText, 10, 20, 0xFFFFFF);
+
         RenderSystem.disableBlend(); RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
         super.render(gg, mouseX, mouseY, partialTick);
     }
 
-    /** Desenha apenas o ponteiro (Sua versão visualmente correta) */
+    // drawPointer permanece o mesmo
     private void drawPointer(GuiGraphics gg, float centerX, float centerY, float visualAngle) {
         double rad = Math.toRadians(-visualAngle);
         float px = centerX + POINTER_TRACK_RADIUS * (float) Math.cos(rad);
@@ -118,100 +169,114 @@ public class GeradorScreen extends Screen {
     @Override
     public void tick() {
         super.tick();
-        this.pointerDeg += POINTER_SPEED_PER_TICK;
+        if (this.currentPhase <= 0) return; // Não faz nada se não iniciou ou já fechou
 
-        if (--timeLeftTicks <= 0) {
-            handleFailure(true); // Chama falha no timeout
+        // Atualiza posição do ponteiro com velocidade atual
+        this.pointerDeg = normalizeDegrees(this.pointerDeg + this.currentPointerSpeed);
+
+        // Verifica Timeout
+        if (--this.ticksRemainingThisPhase <= 0) {
+            handleFailure("Tempo esgotado na Fase " + this.currentPhase);
             return;
         }
-        // Som do timer (Corrigido)
-        if (this.timeLeftTicks > 0 && this.timeLeftTicks % 20 == 0) {
-            Minecraft mc = Minecraft.getInstance();
-            if (mc.player != null && mc.level != null) { mc.level.playSound(mc.player, mc.player.blockPosition(), SoundEvents.NOTE_BLOCK_BIT.get(), SoundSource.PLAYERS, 0.5f, 1.5f); }
+
+        // Som do timer
+        if (this.ticksRemainingThisPhase > 0 && this.ticksRemainingThisPhase % 20 == 0) {
+            playSound(SoundEvents.NOTE_BLOCK_BIT.get(), 0.5f, 1.5f);
         }
     }
 
-    // --- mouseClicked() COM CORREÇÃO DE ESPELHAMENTO ---
+    // --- mouseClicked() ---
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        // Só permite clique se o tempo não acabou (na versão final)
-        if (timeLeftTicks > 0 && button == 0) {
+        // Verifica se o jogo está ativo e foi clique esquerdo
+        if (this.currentPhase > 0 && this.ticksRemainingThisPhase > 0 && button == 0) {
             float currentPointerAngle = normalizeDegrees(this.pointerDeg);
+            float checkAngle = normalizeDegrees(-currentPointerAngle - this.randomRotationOffset); // Corrige pela rotação da base
 
-            // <<< CORREÇÃO HITBOX: Espelha E Ajusta pelo Offset >>>
-            float checkAngle = normalizeDegrees(-currentPointerAngle - this.randomRotationOffset);
-
-            // 1. Verifica Acerto Crítico
+            // Verifica Acerto Crítico (Amarelo)
             if (isInRange(checkAngle, CRIT_ZONE_1_START, CRIT_ZONE_1_END) ||
                     isInRange(checkAngle, CRIT_ZONE_2_START, CRIT_ZONE_2_END))
             {
-                handleCritHit(); // Chama handler que fecha a tela
-                return true;
+                playSound(SoundEvents.NOTE_BLOCK_BELL.get(), 0.7f, 1.5f); // Som avanço/crítico
+                if (this.currentPhase < 3) {
+                    startPhase(this.currentPhase + 1); // Avança para próxima fase
+                } else {
+                    handleFinalSuccess(); // Completou fase 3!
+                }
+                return true; // Clique processado
             }
-            // 2. Verifica Acerto Normal
+            // Verifica Acerto Normal (Verde)
             else if (isInRange(checkAngle, CATCH_ZONE_1_START, CATCH_ZONE_1_END) ||
                     isInRange(checkAngle, CATCH_ZONE_2_START, CATCH_ZONE_2_END))
             {
-                this.catchHitCounter++;
-                if (this.catchHitCounter <= 2) {
-                    handleCatchHit(); // Chama handler que adiciona tempo
+                if (!this.catchBonusUsedThisPhase) {
+                    // Primeiro acerto verde: Bônus!
+                    this.ticksRemainingThisPhase += Config.catchBonusTicks; // Usa valor da Config
+                    this.catchBonusUsedThisPhase = true;
+                    playSound(SoundEvents.NOTE_BLOCK_CHIME.get(), 0.6f, 1.2f);
+                    // Usa chave de tradução
+                    sendMessage(Component.translatable("message.cantinhospooky.gerador.bonus_time"));
                 } else {
-                    handleFailure(false); // Chama handler que fecha a tela
+                    // Segundo acerto verde: Falha!
+                    handleFailure("Acertou a área bônus duas vezes na Fase " + this.currentPhase);
                 }
-                return true;
+                return true; // Clique processado
             }
-            // 3. Errou
+            // Errou as Zonas
             else
             {
-                handleFailure(false); // Chama handler que fecha a tela
-                return true;
+                handleFailure("Errou as zonas de acerto na Fase " + this.currentPhase);
+                return true; // Clique processado
             }
         }
-        return super.mouseClicked(mouseX, mouseY, button);
-    }
-
-    // --- HANDLERS (VERSÃO NORMAL QUE FECHA A TELA) ---
-
-    private void handleCritHit() {
-        LOGGER.info("Acerto CRÍTICO!");
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.player != null && mc.level != null) {
-            // Som (Corrigido)
-            mc.level.playSound(mc.player, mc.player.blockPosition(), SoundEvents.PLAYER_LEVELUP, SoundSource.PLAYERS, 0.7f, 1.0f);
-            mc.player.sendSystemMessage(Component.literal("Acerto crítico!"));
-        }
-        PacketHandler.sendToServer(new CritSuccessPacket());
-        this.minecraft.setScreen(null); // Fecha
-    }
-
-    private void handleCatchHit() {
-        LOGGER.info("Acerto normal #{} - Ganhando tempo extra.", this.catchHitCounter);
-        Minecraft mc = Minecraft.getInstance();
-        this.timeLeftTicks += 80; // Adiciona tempo
-        if (mc.player != null && mc.level != null) {
-            // Som (Corrigido)
-            mc.level.playSound(mc.player, mc.player.blockPosition(), SoundEvents.NOTE_BLOCK_BELL.get(), SoundSource.PLAYERS, 0.6f, 1.2f);
-            mc.player.sendSystemMessage(Component.literal("Tempo extra! Tente o acerto crítico!"));
-        }
-        // Não fecha
-    }
-
-    private void handleFailure(boolean isTimeout) {
-        if(isTimeout) { LOGGER.info("Falha por Tempo Esgotado!"); }
-        else { LOGGER.info("Falha por Erro ou Tentativas Excedidas!"); }
-        Minecraft mc = Minecraft.getInstance();
-        // Toca som de falha (CORRIGIDO para tocar sempre)
-        if (mc.player != null && mc.level != null) {
-            mc.level.playSound(mc.player, mc.player.blockPosition(), SoundEvents.VILLAGER_NO, SoundSource.PLAYERS, 0.8f, 0.8f );
-        }
-        // PacketHandler.sendToServer(new FailResultPacket()); // Opcional
-        if (mc.player != null) { mc.player.sendSystemMessage(Component.literal("Falha no minigame!")); }
-        this.minecraft.setScreen(null); // Fecha
+        return super.mouseClicked(mouseX, mouseY, button); // Clique não foi processado aqui
     }
 
 
-    // --- Métodos auxiliares ---
+    // --- Handlers de Resultado Final ---
+    private void handleFinalSuccess() {
+        LOGGER.info("SUCESSO FINAL no reparo do Gerador em {}", this.blockPos);
+        playSound(SoundEvents.PLAYER_LEVELUP, 0.8f, 1.0f);
+        // Usa chave de tradução
+        sendMessage(Component.translatable("message.cantinhospooky.gerador.success"));
+        // Envia pacote com BlockPos
+        PacketHandler.sendToServer(new CritSuccessPacket(this.blockPos));
+        closeScreen();
+    }
+
+    private void handleFailure(String reason) {
+        LOGGER.info("FALHA no reparo do Gerador em {}: {}", this.blockPos, reason);
+        playSound(SoundEvents.VILLAGER_NO, 0.8f, 0.8f );
+        // Usa chave de tradução
+        sendMessage(Component.translatable("message.cantinhospooky.gerador.fail"));
+        // Envia pacote com BlockPos
+        PacketHandler.sendToServer(new FailResultPacket(this.blockPos));
+        closeScreen();
+    }
+
+    // --- Métodos Auxiliares ---
     private static float normalizeDegrees(float degreesIn) { float r = degreesIn % 360.0F; return r >= 0.0F ? r : r + 360.0F; }
     private boolean isInRange(float angle, float start, float end) { float a = normalizeDegrees(angle); if (start <= end) { return a >= start && a <= end; } else { return a >= start || a <= end; } }
 
-} // Fim da classe GeradorScreen
+    private void playSound(SoundEvent sound, float volume, float pitch) {
+        if (this.minecraft != null && this.minecraft.player != null) {
+            this.minecraft.player.playNotifySound(sound, SoundSource.PLAYERS, volume, pitch);
+        }
+    }
+
+    private void sendMessage(Component message) {
+        if (this.minecraft != null && this.minecraft.player != null) {
+            this.minecraft.player.displayClientMessage(message, true); // true = na action bar
+        }
+    }
+
+    private void closeScreen() {
+        if (this.minecraft != null) {
+            this.minecraft.setScreen(null);
+        }
+        // Zera a fase para parar o tick completamente
+        this.currentPhase = 0;
+        this.ticksRemainingThisPhase = 0;
+    }
+}

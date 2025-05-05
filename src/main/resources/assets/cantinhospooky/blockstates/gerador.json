@@ -1,7 +1,10 @@
 {
   "variants": {
-    "": {
-      "model": "cantinhospooky:block/gerador"
+    "needs_repair=true": {
+      "model": "cantinhospooky:block/gerador_off"
+    },
+    "needs_repair=false": {
+      "model": "cantinhospooky:block/gerador_on"
     }
   }
 }

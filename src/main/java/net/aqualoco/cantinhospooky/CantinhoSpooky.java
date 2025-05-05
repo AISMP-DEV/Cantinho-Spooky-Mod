@@ -2,6 +2,7 @@ package net.aqualoco.cantinhospooky;
 
 import com.mojang.logging.LogUtils;
 import net.aqualoco.cantinhospooky.block.ModBlocks;
+import net.aqualoco.cantinhospooky.block.entity.ModBlockEntities;
 import net.aqualoco.cantinhospooky.item.ModItems;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraftforge.api.distmarker.Dist;
@@ -29,6 +30,7 @@ public class CantinhoSpooky {
 
         ModItems.register(modEventBus);
         ModBlocks.register(modEventBus);
+        ModBlockEntities.register(modEventBus);
 
 
         modEventBus.addListener(this::commonSetup);
@@ -36,7 +38,7 @@ public class CantinhoSpooky {
         MinecraftForge.EVENT_BUS.register(this);
         modEventBus.addListener(this::addCreative);
 
-        context.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
+        context.registerConfig(ModConfig.Type.COMMON, Config.COMMON_SPEC);
 
 
 

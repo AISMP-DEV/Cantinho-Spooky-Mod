@@ -1,0 +1,20 @@
+{
+   "block.cantinhospooky.gerador": "Gerador",
+   "item.cantinhospooky.gerador": "Gerador",
+
+   "message.cantinhospooky.gerador.cooldown": "O Gerador precisa de um tempo...",
+   "message.cantinhospooky.gerador.repaired": "Este Gerador já está funcionando.",
+   "message.cantinhospooky.gerador.success": "§aGerador reparado com sucesso!",
+   "message.cantinhospooky.gerador.fail": "§cFalha no reparo!",
+   "message.cantinhospooky.gerador.bonus_time": "Tempo extra!",
+
+
+   "config.cantinhospooky.globalCooldownTicks": "Cooldown Global (Ticks)",
+   "config.cantinhospooky.phase1DurationTicks": "Duração Fase 1 (Ticks)",
+   "config.cantinhospooky.phase2DurationTicks": "Duração Fase 2 (Ticks)",
+   "config.cantinhospooky.phase3DurationTicks": "Duração Fase 3 (Ticks)",
+   "config.cantinhospooky.phase1Speed": "Velocidade Ponteiro Fase 1",
+   "config.cantinhospooky.phase2Speed": "Velocidade Ponteiro Fase 2",
+   "config.cantinhospooky.phase3Speed": "Velocidade Ponteiro Fase 3",
+   "config.cantinhospooky.catchBonusTicks": "Bônus Zona de Captura (Ticks)"
+}

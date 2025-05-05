@@ -1,10 +1,20 @@
 {
-   //"item.cantinhospooky.gerador": "Gerador"
+   "block.cantinhospooky.gerador": "Generator",
+   "item.cantinhospooky.gerador": "Generator",
+
+   "message.cantinhospooky.gerador.cooldown": "Generator on global cooldown!",
+   "message.cantinhospooky.gerador.repaired": "This Generator is already working.",
+   "message.cantinhospooky.gerador.success": "§aGenerator successfully repaired!",
+   "message.cantinhospooky.gerador.fail": "§cRepair failed!",
+   "message.cantinhospooky.gerador.bonus_time": "Extra time!",
 
 
-
-
-
-
-   "block.cantinhospooky.gerador": "Gerador"
+   "config.cantinhospooky.globalCooldownTicks": "Global Cooldown Ticks",
+   "config.cantinhospooky.phase1DurationTicks": "Phase 1 Duration Ticks",
+   "config.cantinhospooky.phase2DurationTicks": "Phase 2 Duration Ticks",
+   "config.cantinhospooky.phase3DurationTicks": "Phase 3 Duration Ticks",
+   "config.cantinhospooky.phase1Speed": "Phase 1 Pointer Speed",
+   "config.cantinhospooky.phase2Speed": "Phase 2 Pointer Speed",
+   "config.cantinhospooky.phase3Speed": "Phase 3 Pointer Speed",
+   "config.cantinhospooky.catchBonusTicks": "Catch Zone Bonus Ticks"
 }

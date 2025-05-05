@@ -1,7 +1,6 @@
 package net.aqualoco.cantinhospooky.block;
 
 import net.aqualoco.cantinhospooky.CantinhoSpooky;
-import net.aqualoco.cantinhospooky.block.custom.GeradorBlock;
 import net.aqualoco.cantinhospooky.item.ModItems;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;

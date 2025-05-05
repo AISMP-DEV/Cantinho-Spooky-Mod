@@ -1,6 +1,6 @@
 {
   "parent": "minecraft:block/cube_all",
   "textures": {
-    "all": "cantinhospooky:block/gerador"
+    "all": "cantinhospooky:block/gerador_on"
   }
 }
