@@ -14,6 +14,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
 import net.aqualoco.cantinhospooky.Config;
+import net.aqualoco.cantinhospooky.block.GeradorBlock;
 
 // Importações para Partículas/Efeitos (Exemplo)
 import net.minecraft.core.particles.ParticleTypes;
@@ -56,13 +57,26 @@ public class GeradorBlockEntity extends BlockEntity {
 
     /** Marca o bloco como reparado com sucesso. */
     public void setRepaired() {
-        if (this.needsRepair) {
+        if (this.needsRepair && this.level != null && !this.level.isClientSide()) {
             this.needsRepair = false;
-            this.globalCooldownExpiryTick = 0L; // Garante que o cooldown global seja resetado
+            this.globalCooldownExpiryTick = 0L;
+
+
             // TODO: Futuramente, mudar o BlockState aqui para refletir visualmente (e remover fumaça?)
-            setChangedAndSync();
             // Exemplo: Remover fumaça visualmente (requer estado no BlockState)
             // if(this.level instanceof ServerLevel serverLevel) { ... }
+
+
+            // Pega o estado atual do bloco no mundo
+            BlockState currentState = getBlockState();
+            // Cria o novo estado com NEEDS_REPAIR = false
+            BlockState newState = currentState.setValue(GeradorBlock.NEEDS_REPAIR, false);
+            // Define o novo estado no mundo na posição deste BlockEntity
+            // O '3' é uma flag padrão para notificar clientes e atualizar iluminação/comparadores
+
+            setChanged();
+
+            this.level.setBlock(this.worldPosition, newState, 3);
         }
     }
 
